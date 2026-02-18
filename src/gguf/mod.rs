@@ -283,3 +283,27 @@ fn compute_byte_length(shape: &[u64], dtype: u32) -> u64 {
         _ => 0,                      // Quantized types - byte size unknown, return 0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_gguf_dtype_str() {
+        assert_eq!(gguf_dtype_str(0), "f32");
+        assert_eq!(gguf_dtype_str(1), "f16");
+        assert_eq!(gguf_dtype_str(26), "i32");
+        assert_eq!(gguf_dtype_str(27), "i64");
+        assert_eq!(gguf_dtype_str(28), "f64");
+    }
+
+    #[test]
+    fn test_compute_byte_length() {
+        let shape = vec![2, 3, 4];
+        assert_eq!(compute_byte_length(&shape, 0), 2 * 3 * 4 * 4); // f32
+        assert_eq!(compute_byte_length(&shape, 1), 2 * 3 * 4 * 2); // f16
+        assert_eq!(compute_byte_length(&shape, 24), 2 * 3 * 4 * 1); // i8
+        assert_eq!(compute_byte_length(&shape, 27), 2 * 3 * 4 * 8); // i64
+    }
+}

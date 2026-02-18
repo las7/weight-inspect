@@ -316,7 +316,7 @@ fn main() -> Result<(), AppError> {
             let version_str = artifact
                 .gguf_version
                 .map(|v| v.to_string())
-                .unwrap_or_default();
+                .unwrap_or_else(|| "N/A".to_string());
             println!(
                 "{},{},{},{},{}",
                 format!("{:?}", artifact.format).to_lowercase(),
