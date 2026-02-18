@@ -93,12 +93,5 @@ We intentionally only read headers/metadata because:
 
 If you need content equality (byte-for-byte), that's a separate mode that would require loading all weights.
 
-## Design Principles
-
-1. **Deterministic**: Same input → same output across machines
-2. **Canonical**: Floats serialized as bit patterns, maps sorted
-3. **No heuristics**: Pure structural comparison
-4. **Fail fast**: Invalid files produce clear errors
-
 See [SPEC.md](SPEC.md) for full specification.
 
