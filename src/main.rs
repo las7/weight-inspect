@@ -9,7 +9,9 @@ use weight_inspect::diff;
 use weight_inspect::gguf::parse_gguf;
 use weight_inspect::gguf::GGUFParserError;
 use weight_inspect::hash::compute_structural_hash;
+#[cfg(feature = "onnx")]
 use weight_inspect::onnx::parse_onnx;
+#[cfg(feature = "onnx")]
 use weight_inspect::onnx::OnnxParserError;
 use weight_inspect::safetensors::parse_safetensors;
 use weight_inspect::safetensors::SafetensorsParserError;
@@ -37,6 +39,7 @@ pub enum AppError {
         path: String,
         source: SafetensorsParserError,
     },
+    #[cfg(feature = "onnx")]
     #[error("failed to parse ONNX file '{path}': {source}")]
     OnnxParse {
         path: String,
@@ -85,16 +88,19 @@ enum Commands {
 }
 
 fn detect_format(path: &Path) -> Result<Artifact, AppError> {
-    if path.extension().map_or(false, |e| e == "onnx") {
-        let file = File::open(path).map_err(|e| AppError::FileOpen {
-            path: path.display().to_string(),
-            source: e,
-        })?;
-        let mut reader = BufReader::new(file);
-        return parse_onnx(&mut reader).map_err(|e| AppError::OnnxParse {
-            path: path.display().to_string(),
-            source: e,
-        });
+    #[cfg(feature = "onnx")]
+    {
+        if path.extension().map_or(false, |e| e == "onnx") {
+            let file = File::open(path).map_err(|e| AppError::FileOpen {
+                path: path.display().to_string(),
+                source: e,
+            })?;
+            let mut reader = BufReader::new(file);
+            return parse_onnx(&mut reader).map_err(|e| AppError::OnnxParse {
+                path: path.display().to_string(),
+                source: e,
+            });
+        }
     }
 
     let mut file = File::open(path).map_err(|e| AppError::FileOpen {

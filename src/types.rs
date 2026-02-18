@@ -1,6 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
+use std::hash::Hash;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Artifact {
@@ -61,10 +62,32 @@ impl PartialEq for CanonicalValue {
     }
 }
 
+impl Hash for CanonicalValue {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            CanonicalValue::Null => 0u8.hash(state),
+            CanonicalValue::Bool(b) => b.hash(state),
+            CanonicalValue::Int(i) => i.hash(state),
+            CanonicalValue::Float(f) => f.to_bits().hash(state),
+            CanonicalValue::String(s) => s.hash(state),
+            CanonicalValue::Array(arr) => arr.hash(state),
+            CanonicalValue::Uint8(i) => i.hash(state),
+            CanonicalValue::Int8(i) => i.hash(state),
+            CanonicalValue::Uint16(i) => i.hash(state),
+            CanonicalValue::Int16(i) => i.hash(state),
+            CanonicalValue::Uint32(i) => i.hash(state),
+            CanonicalValue::Int32(i) => i.hash(state),
+            CanonicalValue::Uint64(i) => i.hash(state),
+            CanonicalValue::Int64(i) => i.hash(state),
+            CanonicalValue::Float32(f) => f.to_bits().hash(state),
+        }
+    }
+}
+
 pub struct CanonicalSerializer;
 
 impl CanonicalSerializer {
-    pub fn serialize_value(&self, value: &CanonicalValue) -> String {
+    pub fn serialize_value(value: &CanonicalValue) -> String {
         match value {
             CanonicalValue::Null => "null".to_string(),
             CanonicalValue::Bool(b) => b.to_string(),
@@ -72,7 +95,10 @@ impl CanonicalSerializer {
             CanonicalValue::Float(fl) => fl.to_bits().to_string(),
             CanonicalValue::String(s) => format!("\"{}\"", escape_string(s)),
             CanonicalValue::Array(arr) => {
-                let items: Vec<String> = arr.iter().map(|v| self.serialize_value(v)).collect();
+                let items: Vec<String> = arr
+                    .iter()
+                    .map(|v| CanonicalSerializer::serialize_value(v))
+                    .collect();
                 format!("[{}]", items.join(","))
             }
             CanonicalValue::Uint8(i) => (*i).to_string(),
@@ -143,7 +169,7 @@ impl Serialize for CanonicalValue {
     where
         S: serde::Serializer,
     {
-        let s = CanonicalSerializer.serialize_value(self);
+        let s = CanonicalSerializer::serialize_value(self);
         serializer.serialize_str(&s)
     }
 }

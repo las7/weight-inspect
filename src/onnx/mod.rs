@@ -1,3 +1,5 @@
+#![cfg(feature = "onnx")]
+
 use crate::types::{Artifact, CanonicalValue, Format, Tensor};
 use prost::Message;
 use std::collections::BTreeMap;
