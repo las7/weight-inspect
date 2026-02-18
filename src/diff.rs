@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 
 #[derive(Debug, Default, Serialize)]
 pub struct DiffResult {
+    pub schema: u32,
     pub format_equal: bool,
     pub hash_equal: bool,
     pub tensor_count_equal: bool,
@@ -14,6 +15,15 @@ pub struct DiffResult {
     pub tensors_added: Vec<String>,
     pub tensors_removed: Vec<String>,
     pub tensor_changes: Vec<TensorChange>,
+}
+
+impl DiffResult {
+    pub fn new() -> Self {
+        Self {
+            schema: 1,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -35,12 +45,10 @@ pub struct TensorChange {
 }
 
 pub fn diff(a: &Artifact, b: &Artifact) -> DiffResult {
-    let mut result = DiffResult {
-        format_equal: a.format == b.format,
-        tensor_count_equal: a.tensors.len() == b.tensors.len(),
-        metadata_count_equal: a.metadata.len() == b.metadata.len(),
-        ..Default::default()
-    };
+    let mut result = DiffResult::new();
+    result.format_equal = a.format == b.format;
+    result.tensor_count_equal = a.tensors.len() == b.tensors.len();
+    result.metadata_count_equal = a.metadata.len() == b.metadata.len();
 
     let keys_a: BTreeSet<_> = a.metadata.keys().collect();
     let keys_b: BTreeSet<_> = b.metadata.keys().collect();
@@ -296,5 +304,87 @@ mod tests {
         let result = diff(&a, &b);
 
         assert!(!result.has_changes());
+    }
+
+    #[test]
+    fn test_determinism_metadata_order() {
+        use crate::hash::compute_structural_hash;
+
+        let mut a = create_test_artifact(Format::GGUF, 3, 0);
+        let mut b = create_test_artifact(Format::GGUF, 3, 0);
+
+        a.metadata.insert(
+            "zzz_key".to_string(),
+            CanonicalValue::String("zzz".to_string()),
+        );
+        a.metadata.insert(
+            "aaa_key".to_string(),
+            CanonicalValue::String("aaa".to_string()),
+        );
+
+        b.metadata.insert(
+            "aaa_key".to_string(),
+            CanonicalValue::String("aaa".to_string()),
+        );
+        b.metadata.insert(
+            "zzz_key".to_string(),
+            CanonicalValue::String("zzz".to_string()),
+        );
+
+        let hash_a = compute_structural_hash(&a);
+        let hash_b = compute_structural_hash(&b);
+
+        assert_eq!(hash_a, hash_b, "Metadata order should not affect hash");
+    }
+
+    #[test]
+    fn test_determinism_tensor_order() {
+        use crate::hash::compute_structural_hash;
+
+        let mut a = create_test_artifact(Format::GGUF, 0, 2);
+        let mut b = create_test_artifact(Format::GGUF, 0, 2);
+
+        a.tensors.insert(
+            "zzz_tensor".to_string(),
+            Tensor {
+                name: "zzz_tensor".to_string(),
+                dtype: "f32".to_string(),
+                shape: vec![10],
+                byte_length: 40,
+            },
+        );
+        a.tensors.insert(
+            "aaa_tensor".to_string(),
+            Tensor {
+                name: "aaa_tensor".to_string(),
+                dtype: "f32".to_string(),
+                shape: vec![10],
+                byte_length: 40,
+            },
+        );
+
+        b.tensors.insert(
+            "aaa_tensor".to_string(),
+            Tensor {
+                name: "aaa_tensor".to_string(),
+                dtype: "f32".to_string(),
+                shape: vec![10],
+                byte_length: 40,
+            },
+        );
+        b.tensors.insert(
+            "zzz_tensor".to_string(),
+            Tensor {
+                name: "zzz_tensor".to_string(),
+                dtype: "f32".to_string(),
+                shape: vec![10],
+                byte_length: 40,
+            },
+        );
+
+        let hash_a = compute_structural_hash(&a);
+        let hash_b = compute_structural_hash(&b);
+
+        assert_eq!(hash_a, hash_b, "Tensor order should not affect hash");
     }
 }

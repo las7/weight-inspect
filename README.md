@@ -32,7 +32,7 @@ modeldiff id model.gguf
 # Diff two files
 modeldiff diff a.gguf b.gguf
 
-# JSON output
+# JSON output (for tooling/integration)
 modeldiff diff a.gguf b.gguf --json
 
 # Quiet mode (exit 0 if identical, 1 if different)
@@ -52,10 +52,30 @@ modeldiff diff a.gguf b.gguf --quiet
 
 ## What it does NOT do
 
+- **Never loads weight data** - Only reads headers and tensor descriptors
 - Execute models
 - Predict runtime compatibility
-- Load tensor data (only reads headers/metadata)
 - Security scanning
+
+### Why no weight data?
+
+We intentionally only read headers/metadata because:
+
+- **Fast**: Works on huge models without loading gigabytes
+- **Memory safe**: No memory spikes on large files
+- **Cross-platform**: Deterministic across any machine
+- **Structural focus**: Answer "are these the same model?" not "are these identical files?"
+
+If you need content equality (byte-for-byte), that's a separate mode that would require loading all weights.
+
+## Design Principles
+
+1. **Deterministic**: Same input → same output across machines
+2. **Canonical**: Floats serialized as bit patterns, maps sorted
+3. **No heuristics**: Pure structural comparison
+4. **Fail fast**: Invalid files produce clear errors
+
+See [SPEC.md](SPEC.md) for full specification.
 
 ## Use cases
 
