@@ -45,6 +45,8 @@ pub enum AppError {
         path: String,
         source: OnnxParserError,
     },
+    #[error("ONNX support not enabled: rebuild with --features onnx")]
+    OnnxNotSupported { path: String },
     #[error("JSON error: {0}")]
     Json(serde_json::Error),
 }
@@ -69,18 +71,28 @@ enum Commands {
     Diff {
         file_a: String,
         file_b: String,
-        #[arg(long)]
+        #[arg(long, default_value = "false")]
         json: bool,
+        #[arg(long, default_value = "text")]
+        format: String,
+        #[arg(long, default_value = "false")]
+        fail_on_diff: bool,
+        #[arg(long, default_value = "false")]
+        only_changes: bool,
+        #[arg(long, default_value = "false")]
+        verbose: bool,
     },
     Id {
         file: String,
-        #[arg(long)]
+        #[arg(long, default_value = "false")]
         json: bool,
     },
     Inspect {
         file: String,
-        #[arg(long)]
+        #[arg(long, default_value = "false")]
         json: bool,
+        #[arg(long, default_value = "false")]
+        verbose: bool,
     },
     Summary {
         file: String,
@@ -88,9 +100,10 @@ enum Commands {
 }
 
 fn detect_format(path: &Path) -> Result<Artifact, AppError> {
-    #[cfg(feature = "onnx")]
-    {
-        if path.extension().map_or(false, |e| e == "onnx") {
+    // Check for .onnx extension first (before magic byte detection)
+    if path.extension().map_or(false, |e| e == "onnx") {
+        #[cfg(feature = "onnx")]
+        {
             let file = File::open(path).map_err(|e| AppError::FileOpen {
                 path: path.display().to_string(),
                 source: e,
@@ -99,6 +112,12 @@ fn detect_format(path: &Path) -> Result<Artifact, AppError> {
             return parse_onnx(&mut reader).map_err(|e| AppError::OnnxParse {
                 path: path.display().to_string(),
                 source: e,
+            });
+        }
+        #[cfg(not(feature = "onnx"))]
+        {
+            return Err(AppError::OnnxNotSupported {
+                path: path.display().to_string(),
             });
         }
     }
@@ -214,6 +233,10 @@ fn main() -> Result<(), AppError> {
             file_a,
             file_b,
             json,
+            format,
+            fail_on_diff,
+            only_changes,
+            verbose,
         } => {
             let artifact_a = detect_format(Path::new(&file_a))?;
             let artifact_b = detect_format(Path::new(&file_b))?;
@@ -224,7 +247,11 @@ fn main() -> Result<(), AppError> {
             let mut result = diff::diff(&artifact_a, &artifact_b);
             result.hash_equal = hash_a == hash_b;
 
-            print_diff(&result, json)?;
+            if fail_on_diff && result.has_changes() {
+                std::process::exit(1);
+            }
+
+            print_diff_extended(&result, json, &format, only_changes, verbose)?;
         }
         Commands::Id { file, json } => {
             let artifact = detect_format(Path::new(&file))?;
@@ -251,13 +278,28 @@ fn main() -> Result<(), AppError> {
                     serde_json::to_string_pretty(&output).map_err(AppError::Json)?
                 );
             } else {
-                println!("format: {:?}", artifact.format);
+                println!("Structural identity");
+                println!("──────────────────");
+                println!(
+                    "ID:        wi:{}:{}:{}",
+                    format!("{:?}", artifact.format).to_lowercase(),
+                    artifact.gguf_version.unwrap_or(0),
+                    &hash[..8]
+                );
+                println!("Stable:    yes (machine independent)");
+                println!("Includes:  header, tensor names, shapes, dtypes");
+                println!("Excludes:  raw weight bytes");
+                println!("\nformat: {:?}", artifact.format);
                 println!("structural_hash: {}", hash);
                 println!("tensor_count: {}", artifact.tensors.len());
                 println!("metadata_count: {}", artifact.metadata.len());
             }
         }
-        Commands::Inspect { file, json } => {
+        Commands::Inspect {
+            file,
+            json,
+            verbose,
+        } => {
             let artifact = detect_format(Path::new(&file))?;
             let hash = compute_structural_hash(&artifact)?;
 
@@ -284,29 +326,7 @@ fn main() -> Result<(), AppError> {
                     serde_json::to_string_pretty(&output).map_err(AppError::Json)?
                 );
             } else {
-                println!("format: {:?}", artifact.format);
-                if let Some(version) = artifact.gguf_version {
-                    println!("gguf_version: {}", version);
-                }
-                println!("tensor_count: {}", artifact.tensors.len());
-                println!("metadata_count: {}", artifact.metadata.len());
-                println!("structural_hash: {}", hash);
-
-                if !artifact.tensors.is_empty() {
-                    println!("\nFirst 5 tensors:");
-                    for (i, (name, tensor)) in artifact.tensors.iter().take(5).enumerate() {
-                        println!(
-                            "  {}: {} {:?} ({})",
-                            i + 1,
-                            name,
-                            tensor.shape,
-                            tensor.dtype
-                        );
-                    }
-                    if artifact.tensors.len() > 5 {
-                        println!("  ... and {} more", artifact.tensors.len() - 5);
-                    }
-                }
+                print_inspect(&artifact, &hash, verbose);
             }
         }
         Commands::Summary { file } => {
@@ -327,5 +347,185 @@ fn main() -> Result<(), AppError> {
             );
         }
     }
+    Ok(())
+}
+
+fn print_inspect(artifact: &Artifact, hash: &str, verbose: bool) {
+    let format_str = format!("{:?}", artifact.format).to_lowercase();
+    let version_str = artifact
+        .gguf_version
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "N/A".to_string());
+
+    println!("{}", format_str);
+    println!("───");
+    println!("Version:  {}", version_str);
+    println!("Tensors:  {}", artifact.tensors.len());
+    println!("Metadata: {}", artifact.metadata.len());
+
+    if verbose {
+        println!("\nStructural summary");
+        println!("──────────────────");
+
+        // Count dtypes
+        let mut dtype_counts: std::collections::HashMap<&str, usize> =
+            std::collections::HashMap::new();
+        for tensor in artifact.tensors.values() {
+            *dtype_counts.entry(&tensor.dtype).or_insert(0) += 1;
+        }
+
+        let total: usize = dtype_counts.values().sum();
+        println!(
+            "Dtypes:  {}",
+            dtype_counts
+                .iter()
+                .map(|(k, v)| format!("{} ({}%)", k, (v * 100) / total))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
+    println!("\nStructural ID");
+    println!("─────────────");
+    println!("Hash: {}", hash);
+
+    if !artifact.tensors.is_empty() && verbose {
+        println!("\nTensors (first 10)");
+        println!("──────────────────");
+        for (name, tensor) in artifact.tensors.iter().take(10) {
+            let shape_str = format!("{:?}", tensor.shape);
+            println!(
+                "{}  {}  {}  {}",
+                name, tensor.dtype, shape_str, tensor.byte_length
+            );
+        }
+        if artifact.tensors.len() > 10 {
+            println!("... and {} more", artifact.tensors.len() - 10);
+        }
+    }
+}
+
+fn print_diff_extended(
+    result: &diff::DiffResult,
+    json: bool,
+    format: &str,
+    only_changes: bool,
+    verbose: bool,
+) -> Result<(), AppError> {
+    if json {
+        print_diff(result, true)?;
+        return Ok(());
+    }
+
+    if format == "md" {
+        print_diff_markdown(result, only_changes)?;
+        return Ok(());
+    }
+
+    // Default text format with verdict header
+    let status = if result.has_changes() {
+        "DIFFERENT"
+    } else {
+        "IDENTICAL"
+    };
+    println!("{}", status);
+    println!("{}", "-".repeat(20));
+
+    if result.has_changes() {
+        println!("Added tensors:    {}", result.tensors_added.len());
+        println!("Removed tensors: {}", result.tensors_removed.len());
+        println!("Modified tensors: {}", result.tensor_changes.len());
+    } else {
+        println!("No structural differences found.");
+    }
+
+    println!(
+        "Structural ID:    {}",
+        if result.hash_equal {
+            "unchanged"
+        } else {
+            "changed"
+        }
+    );
+
+    if !only_changes && !result.has_changes() {
+        return Ok(());
+    }
+
+    if !result.tensor_changes.is_empty() && verbose {
+        println!("\nTensor changes");
+        println!("─────────────");
+        for change in &result.tensor_changes {
+            println!("  {}", change.name);
+            if let (Some(old), Some(new)) = (&change.dtype_old, &change.dtype_new) {
+                println!("    dtype: {} -> {}", old, new);
+            }
+            if let (Some(old), Some(new)) = (&change.shape_old, &change.shape_new) {
+                println!("    shape: {:?} -> {:?}", old, new);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn print_diff_markdown(result: &diff::DiffResult, only_changes: bool) -> Result<(), AppError> {
+    let status = if result.has_changes() {
+        "❌ DIFFERENT"
+    } else {
+        "✅ IDENTICAL"
+    };
+    println!("## Structural Diff");
+    println!();
+    println!("**Status:** {}", status);
+    println!();
+    println!("| Change Type | Count |");
+    println!("|-------------|-------|");
+    println!("| Added tensors | {} |", result.tensors_added.len());
+    println!("| Removed tensors | {} |", result.tensors_removed.len());
+    println!("| Modified tensors | {} |", result.tensor_changes.len());
+    println!();
+
+    if !only_changes
+        && result.tensors_added.is_empty()
+        && result.tensors_removed.is_empty()
+        && result.tensor_changes.is_empty()
+    {
+        return Ok(());
+    }
+
+    if !result.tensors_added.is_empty() {
+        println!("### Added tensors");
+        println!("```");
+        for name in &result.tensors_added {
+            println!("+ {}", name);
+        }
+        println!("```");
+    }
+
+    if !result.tensors_removed.is_empty() {
+        println!("### Removed tensors");
+        println!("```");
+        for name in &result.tensors_removed {
+            println!("- {}", name);
+        }
+        println!("```");
+    }
+
+    if !result.tensor_changes.is_empty() {
+        println!("### Modified tensors");
+        println!("```");
+        for change in &result.tensor_changes {
+            println!("~ {}", change.name);
+            if let (Some(old), Some(new)) = (&change.dtype_old, &change.dtype_new) {
+                println!("  dtype: {} → {}", old, new);
+            }
+            if let (Some(old), Some(new)) = (&change.shape_old, &change.shape_new) {
+                println!("  shape: {:?} → {:?}", old, new);
+            }
+        }
+        println!("```");
+    }
+
     Ok(())
 }

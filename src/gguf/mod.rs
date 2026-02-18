@@ -287,7 +287,6 @@ fn compute_byte_length(shape: &[u64], dtype: u32) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
     #[test]
     fn test_gguf_dtype_str() {
