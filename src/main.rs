@@ -377,11 +377,15 @@ fn print_inspect(artifact: &Artifact, hash: &str, verbose: bool) {
         let total: usize = dtype_counts.values().sum();
         println!(
             "Dtypes:  {}",
-            dtype_counts
-                .iter()
-                .map(|(k, v)| format!("{} ({}%)", k, (v * 100) / total))
-                .collect::<Vec<_>>()
-                .join(", ")
+            if total > 0 {
+                dtype_counts
+                    .iter()
+                    .map(|(k, v)| format!("{} ({:.1}%)", k, (*v as f64) * 100.0 / total as f64))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            } else {
+                "N/A".to_string()
+            }
         );
     }
 

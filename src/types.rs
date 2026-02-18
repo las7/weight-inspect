@@ -310,4 +310,33 @@ mod tests {
         let deserialized: CanonicalValue = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, original);
     }
+
+    #[test]
+    fn test_hash_determinism() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        fn hash_value(v: &CanonicalValue) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            v.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        // Same values should produce same hash
+        assert_eq!(
+            hash_value(&CanonicalValue::String("test".to_string())),
+            hash_value(&CanonicalValue::String("test".to_string()))
+        );
+
+        // Different values should produce different hashes
+        assert_ne!(
+            hash_value(&CanonicalValue::Int(1)),
+            hash_value(&CanonicalValue::Int(2))
+        );
+
+        // NaN should hash consistently (uses bit representation)
+        let nan1 = CanonicalValue::Float(f64::NAN);
+        let nan2 = CanonicalValue::Float(f64::NAN);
+        assert_eq!(hash_value(&nan1), hash_value(&nan2));
+    }
 }
