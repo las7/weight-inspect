@@ -13,6 +13,8 @@ pub enum SafetensorsParserError {
     InvalidByteLength { name: String, offset: u64, end: u64 },
     #[error("missing required field '{field}' for tensor '{name}'")]
     MissingField { name: String, field: String },
+    #[error("invalid shape dimension at index {index} for tensor '{name}': not a valid u64")]
+    InvalidShape { name: String, index: usize },
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("JSON error: {0}")]
@@ -54,7 +56,19 @@ pub fn parse_safetensors<R: Read + Seek>(
                     }
                 };
                 let shape: Vec<u64> = match tensor_obj.get("shape").and_then(|v| v.as_array()) {
-                    Some(arr) => arr.iter().filter_map(|v| v.as_u64()).collect(),
+                    Some(arr) => {
+                        let mut dims = Vec::with_capacity(arr.len());
+                        for (i, v) in arr.iter().enumerate() {
+                            let dim =
+                                v.as_u64()
+                                    .ok_or_else(|| SafetensorsParserError::InvalidShape {
+                                        name: key.clone(),
+                                        index: i,
+                                    })?;
+                            dims.push(dim);
+                        }
+                        dims
+                    }
                     None => {
                         return Err(SafetensorsParserError::MissingField {
                             name: key.clone(),
