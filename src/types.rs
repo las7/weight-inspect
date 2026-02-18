@@ -284,4 +284,30 @@ mod tests {
         let serialized = serde_json::to_string(&value).unwrap();
         assert_eq!(serialized, "\"true\"");
     }
+
+    #[test]
+    fn test_int_parsing() {
+        let value: CanonicalValue = serde_json::from_str("\"123\"").unwrap();
+        assert_eq!(value, CanonicalValue::Int(123));
+    }
+
+    #[test]
+    fn test_float_parsing() {
+        let value: CanonicalValue = serde_json::from_str("\"1.5\"").unwrap();
+        assert_eq!(value, CanonicalValue::Float(1.5));
+    }
+
+    #[test]
+    fn test_float_scientific_notation() {
+        let value: CanonicalValue = serde_json::from_str("\"1e2\"").unwrap();
+        assert_eq!(value, CanonicalValue::Float(100.0));
+    }
+
+    #[test]
+    fn test_escaped_string_roundtrip() {
+        let original = CanonicalValue::String("hello\nworld".to_string());
+        let serialized = serde_json::to_string(&original).unwrap();
+        let deserialized: CanonicalValue = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, original);
+    }
 }
