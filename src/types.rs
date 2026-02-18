@@ -104,6 +104,40 @@ fn escape_string(s: &str) -> String {
     result
 }
 
+fn unescape_string(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('"') => result.push('"'),
+                Some('\\') => result.push('\\'),
+                Some('n') => result.push('\n'),
+                Some('r') => result.push('\r'),
+                Some('t') => result.push('\t'),
+                Some('u') => {
+                    let mut hex = String::new();
+                    for _ in 0..4 {
+                        if let Some(ch) = chars.next() {
+                            hex.push(ch);
+                        }
+                    }
+                    if let Ok(code) = u32::from_str_radix(&hex, 16) {
+                        if let Some(c) = char::from_u32(code) {
+                            result.push(c);
+                        }
+                    }
+                }
+                Some(c) => result.push(c),
+                None => break,
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 impl Serialize for CanonicalValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -147,12 +181,9 @@ impl<'de> Deserialize<'de> for CanonicalValue {
             }
         }
 
-        if let Ok(i) = s.parse::<i64>() {
-            return Ok(CanonicalValue::Int(i));
-        }
-
         if s.starts_with('"') && s.ends_with('"') {
-            return Ok(CanonicalValue::String(s));
+            let inner = &s[1..s.len() - 1];
+            return Ok(CanonicalValue::String(unescape_string(inner)));
         }
 
         Ok(CanonicalValue::String(s))

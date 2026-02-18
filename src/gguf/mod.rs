@@ -76,8 +76,7 @@ pub fn parse_gguf<R: Read + Seek>(reader: &mut R) -> Result<Artifact, GGUFParser
         }
         let dtype = read_u32(reader)?;
         let _offset = read_u64(reader)?;
-        let byte_length =
-            compute_byte_length(&shape, dtype).ok_or(GGUFParserError::ShapeTooLarge)?;
+        let byte_length = compute_byte_length(&shape, dtype);
 
         tensors.insert(
             name.clone(),
@@ -259,17 +258,16 @@ fn gguf_dtype_str(dtype: u32) -> String {
     }
 }
 
-fn compute_byte_length(shape: &[u64], dtype: u32) -> Option<u64> {
+fn compute_byte_length(shape: &[u64], dtype: u32) -> u64 {
     let mut elements: u64 = 1;
     for &dim in shape {
-        elements = elements.checked_mul(dim)?;
+        elements = elements.checked_mul(dim).unwrap_or(0);
     }
-    let byte_size = match dtype {
-        0 | 26 => elements.checked_mul(4)?,      // f32, i32
-        1 | 25 | 30 => elements.checked_mul(2)?, // f16, i16, bf16
-        24 => elements,                          // i8
-        27 | 28 => elements.checked_mul(8)?,     // i64, f64
-        _ => elements,                           // Quantized types - use element count
-    };
-    Some(byte_size)
+    match dtype {
+        0 | 26 => elements * 4,      // f32, i32
+        1 | 25 | 30 => elements * 2, // f16, i16, bf16
+        24 => elements,              // i8 (1 byte)
+        27 | 28 => elements * 8,     // i64, f64
+        _ => 0,                      // Quantized types - byte size unknown, return 0
+    }
 }

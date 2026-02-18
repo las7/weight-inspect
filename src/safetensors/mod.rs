@@ -11,6 +11,8 @@ pub enum SafetensorsParserError {
     HeaderTooLarge { size: usize, max: usize },
     #[error("invalid tensor length for '{name}': offset {offset} > {end}")]
     InvalidByteLength { name: String, offset: u64, end: u64 },
+    #[error("missing required field '{field}' for tensor '{name}'")]
+    MissingField { name: String, field: String },
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("JSON error: {0}")]
@@ -42,25 +44,47 @@ pub fn parse_safetensors<R: Read + Seek>(
                     }
                 }
             } else if let Some(tensor_obj) = value.as_object() {
-                let dtype = tensor_obj
-                    .get("dtype")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-                let shape: Vec<u64> = tensor_obj
-                    .get("shape")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_u64()).collect())
-                    .unwrap_or_default();
-                let data_offsets = tensor_obj
-                    .get("data_offsets")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        let a = arr.first().and_then(|v| v.as_u64()).unwrap_or(0);
-                        let b = arr.get(1).and_then(|v| v.as_u64()).unwrap_or(0);
+                let dtype = match tensor_obj.get("dtype").and_then(|v| v.as_str()) {
+                    Some(s) => s.to_string(),
+                    None => {
+                        return Err(SafetensorsParserError::MissingField {
+                            name: key.clone(),
+                            field: "dtype".to_string(),
+                        })
+                    }
+                };
+                let shape: Vec<u64> = match tensor_obj.get("shape").and_then(|v| v.as_array()) {
+                    Some(arr) => arr.iter().filter_map(|v| v.as_u64()).collect(),
+                    None => {
+                        return Err(SafetensorsParserError::MissingField {
+                            name: key.clone(),
+                            field: "shape".to_string(),
+                        })
+                    }
+                };
+                let data_offsets = match tensor_obj.get("data_offsets").and_then(|v| v.as_array()) {
+                    Some(arr) if arr.len() >= 2 => {
+                        let a = arr[0].as_u64().ok_or_else(|| {
+                            SafetensorsParserError::MissingField {
+                                name: key.clone(),
+                                field: "data_offsets[0]".to_string(),
+                            }
+                        })?;
+                        let b = arr[1].as_u64().ok_or_else(|| {
+                            SafetensorsParserError::MissingField {
+                                name: key.clone(),
+                                field: "data_offsets[1]".to_string(),
+                            }
+                        })?;
                         [a, b]
-                    })
-                    .unwrap_or([0, 0]);
+                    }
+                    _ => {
+                        return Err(SafetensorsParserError::MissingField {
+                            name: key.clone(),
+                            field: "data_offsets".to_string(),
+                        })
+                    }
+                };
                 let offset = data_offsets[0];
                 let end = data_offsets[1];
                 if end <= offset {
