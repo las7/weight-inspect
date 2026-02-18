@@ -45,6 +45,16 @@ Or build from source:
 cargo build --release
 ```
 
+### ONNX Support
+
+ONNX support is optional. To enable:
+
+```bash
+cargo install weight-inspect --features onnx
+# or
+cargo build --release --features onnx
+```
+
 ## Usage Examples
 
 ### Get a fingerprint

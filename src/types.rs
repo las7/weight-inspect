@@ -124,8 +124,7 @@ fn escape_string(s: &str) -> String {
             '\r' => result.push_str("\\r"),
             '\t' => result.push_str("\\t"),
             c if c.is_ascii_control() => result.push_str(&format!("\\u{:04x}", c as u32)),
-            c if c.is_ascii_graphic() || c == ' ' => result.push(c),
-            _ => result.push_str(&format!("\\u{:04x}", c as u32)),
+            _ => result.push(c),
         }
     }
     result

@@ -66,7 +66,7 @@ pub fn parse_safetensors<R: Read + Seek>(
             }
         } else if let Some(tensor_obj) = value.as_object() {
             let dtype = match tensor_obj.get("dtype").and_then(|v| v.as_str()) {
-                Some(s) => s.to_string(),
+                Some(s) => s.to_lowercase(),
                 None => {
                     return Err(SafetensorsParserError::MissingField {
                         name: key.clone(),
@@ -161,31 +161,4 @@ fn read_header_size<R: Read + Seek>(reader: &mut R) -> Result<usize, Safetensors
         });
     }
     Ok(size)
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_dtype_str() {
-        assert_eq!(safetensors_dtype_str("F32"), "f32");
-        assert_eq!(safetensors_dtype_str("F16"), "f16");
-        assert_eq!(safetensors_dtype_str("I64"), "i64");
-    }
-
-    fn safetensors_dtype_str(dtype: &str) -> String {
-        match dtype.to_uppercase().as_str() {
-            "F32" => "f32".to_string(),
-            "F16" => "f16".to_string(),
-            "BF16" => "bf16".to_string(),
-            "U8" => "u8".to_string(),
-            "I8" => "i8".to_string(),
-            "I64" => "i64".to_string(),
-            "I32" => "i32".to_string(),
-            "I16" => "i16".to_string(),
-            "BOOL" => "bool".to_string(),
-            "F8E5M2" => "f8e5m2".to_string(),
-            "F8E4M3" => "f8e4m3".to_string(),
-            _ => format!("unknown_{}", dtype),
-        }
-    }
 }
