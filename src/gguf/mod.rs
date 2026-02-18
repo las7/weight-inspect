@@ -9,8 +9,12 @@ pub enum GGUFParserError {
     InvalidHeader,
     #[error("invalid magic number")]
     InvalidMagic,
-    #[error("invalid GGUF version: {0}")]
-    InvalidVersion(i32),
+    #[error("unsupported GGUF version: {0}")]
+    UnsupportedVersion(u32),
+    #[error("array element count exceeds maximum ({max}): {count}")]
+    ArrayTooLarge { count: u64, max: usize },
+    #[error("shape dimension exceeds maximum: {0}")]
+    ShapeTooLarge(u64),
     #[error("tensor count exceeds maximum ({max}): {count}")]
     TensorCountTooLarge { count: u64, max: u64 },
     #[error("metadata count exceeds maximum ({max}): {count}")]
@@ -18,10 +22,12 @@ pub enum GGUFParserError {
     #[error("tensor dimensions exceed maximum ({max}): {dims}")]
     DimensionsTooLarge { dims: u32, max: u32 },
     #[error("tensor shape too large (product overflow)")]
-    ShapeTooLarge,
+    ShapeTooLargeOverflow,
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
+
+const MAX_ARRAY_ELEMENTS: usize = 100_000;
 
 const GGUF_MAGIC: u32 = 0x46554747;
 const MAX_TENSOR_COUNT: u64 = 100_000;
@@ -36,7 +42,7 @@ pub fn parse_gguf<R: Read + Seek>(reader: &mut R) -> Result<Artifact, GGUFParser
 
     let version = read_u32(reader)?;
     if version > 4 {
-        return Err(GGUFParserError::InvalidVersion(version as i32));
+        return Err(GGUFParserError::UnsupportedVersion(version));
     }
 
     let tensor_count = read_u64(reader)?;
@@ -141,7 +147,13 @@ fn read_kv<R: Read>(
         9 => {
             let element_type = read_u32(reader)?;
             let n = read_u64(reader)? as usize;
-            let mut arr = Vec::new();
+            if n > MAX_ARRAY_ELEMENTS {
+                return Err(GGUFParserError::ArrayTooLarge {
+                    count: n as u64,
+                    max: MAX_ARRAY_ELEMENTS,
+                });
+            }
+            let mut arr = Vec::with_capacity(n);
             for _ in 0..n {
                 let val = match element_type {
                     0 => CanonicalValue::Uint8(read_u8(reader)? as i64),

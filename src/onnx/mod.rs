@@ -88,7 +88,10 @@ pub fn parse_onnx<R: Read + Seek>(reader: &mut R) -> Result<Artifact, OnnxParser
             let name = init.name.clone().unwrap_or_default();
             let dims: Vec<u64> = init.dims.iter().map(|&x| x as u64).collect();
             let dtype = onnx_dtype_str(init.data_type());
-            let element_count: u64 = dims.iter().product::<u64>();
+            let mut element_count: u64 = 1;
+            for &dim in &dims {
+                element_count = element_count.checked_mul(dim).unwrap_or(0);
+            }
             let byte_length: u64 = element_count
                 .checked_mul(dtype_size(init.data_type()) as u64)
                 .unwrap_or(0);
