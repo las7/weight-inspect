@@ -165,9 +165,6 @@ fn read_header_size<R: Read + Seek>(reader: &mut R) -> Result<usize, Safetensors
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::io::Cursor;
-
     #[test]
     fn test_dtype_str() {
         assert_eq!(safetensors_dtype_str("F32"), "f32");
@@ -185,7 +182,6 @@ mod tests {
             "I64" => "i64".to_string(),
             "I32" => "i32".to_string(),
             "I16" => "i16".to_string(),
-            "I8" => "i8".to_string(),
             "BOOL" => "bool".to_string(),
             "F8E5M2" => "f8e5m2".to_string(),
             "F8E4M3" => "f8e4m3".to_string(),

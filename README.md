@@ -2,6 +2,8 @@
 
 Inspect GGUF and safetensors model files to see what's inside.
 
+Despite the name, `weight-inspect` never loads or interprets weight values — it only inspects structure.
+
 Unlike hashing the full file or loading the model, `weight-inspect` compares **structure only** — making it fast, safe, and deterministic.
 
 ## The Problem
@@ -245,6 +247,14 @@ Use `--format md` for markdown output suitable for PR comments.
 - **Hash versioning**: Schema field in JSON output for future compatibility
 - **Breaking changes**: Will bump major version in CLI and JSON schema
 - **CI-safe**: Use `--fail-on-diff` for exit codes
+
+## Contributing
+
+Contributions are welcome, but please note:
+
+- Output stability and determinism are prioritized over new features
+- Changes that affect identity or ordering require discussion before PR
+- Please run `cargo clippy -- -D warnings` before submitting
 
 ## License
 
