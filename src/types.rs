@@ -97,7 +97,7 @@ impl CanonicalSerializer {
             CanonicalValue::Array(arr) => {
                 let items: Vec<String> = arr
                     .iter()
-                    .map(|v| CanonicalSerializer::serialize_value(v))
+                    .map(CanonicalSerializer::serialize_value)
                     .collect();
                 format!("[{}]", items.join(","))
             }

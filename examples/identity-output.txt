@@ -1,0 +1,41 @@
+# Example: weight-inspect identity output
+
+## Default output (human-readable)
+
+```
+$ weight-inspect identity model.gguf
+Structural identity
+──────────────────
+ID:        wi:gguf:v3:9c1f3d2a
+Stable:    yes (machine independent)
+Includes:  header, tensor names, shapes, dtypes
+Excludes:  raw weight bytes
+
+format: GGUF
+structural_hash: 9c1f3d2a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1
+tensor_count: 291
+metadata_count: 12
+```
+
+## JSON output (machine-readable)
+
+```bash
+$ weight-inspect identity model.gguf --json
+{
+  "schema": 1,
+  "format": "gguf",
+  "structural_hash": "9c1f3d2a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1",
+  "tensor_count": 291,
+  "metadata_count": 12
+}
+```
+
+## Format identifier
+
+The `wi:` prefix identifies weight-inspect structural IDs:
+
+- `wi:gguf:v3` - GGUF format, version 3
+- `wi:gguf:v4` - GGUF format, version 4  
+- `wi:safetensors` - safetensors format
+
+This allows easy identification of which tool and format generated the ID.

@@ -1,0 +1,69 @@
+# Example: weight-inspect inspect output
+
+## Default output (human-readable)
+
+```
+$ weight-inspect inspect model.gguf
+gguf
+───
+Version:  3
+Tensors:  291
+Metadata: 12
+
+Structural ID
+─────────────
+Hash: 9c1f3d2a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1
+
+Tensors (first 10)
+──────────────────
+token_embd.weight  f32  [32000, 4096]  524288000
+blk.0.attn.wq.weight  f16  [4096, 4096]  33554432
+blk.0.attn.wk.weight  f16  [4096, 4096]  33554432
+blk.0.attn.wv.weight  f16  [4096, 4096]  33554432
+blk.0.attn.wo.weight  f16  [4096, 4096]  33554432
+blk.0.mlp.gate_proj.weight  f16  [11008, 4096]  90596966
+blk.0.mlp.up_proj.weight  f16  [11008, 4096]  90596966
+blk.0.mlp.down_proj.weight  f16  [4096, 11008]  90596966
+blk.0.ffn_gate.weight  f16  [11008, 4096]  90596966
+blk.0.ffn_up.weight  f16  [11008, 4096]  90596966
+... and 281 more
+```
+
+## Verbose output (detailed)
+
+```
+$ weight-inspect inspect model.gguf --verbose
+gguf
+───
+Version:  3
+Tensors:  291
+Metadata: 12
+
+Structural summary
+──────────────────
+Dtypes:  f16 (92%), q4_k (8%)
+
+Structural ID
+─────────────
+Hash: 9c1f3d2a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1
+
+Tensors (first 10)
+──────────────────
+token_embd.weight  f32  [32000, 4096]  524288000
+blk.0.attn.wq.weight  f16  [4096, 4096]  33554432
+...
+```
+
+## JSON output (machine-readable)
+
+```bash
+$ weight-inspect inspect model.gguf --json
+{
+  "schema": 1,
+  "format": "gguf",
+  "gguf_version": 3,
+  "tensor_count": 291,
+  "metadata_count": 12,
+  "structural_hash": "9c1f3d2a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1"
+}
+```

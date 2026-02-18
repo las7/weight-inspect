@@ -101,7 +101,7 @@ enum Commands {
 
 fn detect_format(path: &Path) -> Result<Artifact, AppError> {
     // Check for .onnx extension first (before magic byte detection)
-    if path.extension().map_or(false, |e| e == "onnx") {
+    if path.extension().is_some_and(|e| e == "onnx") {
         #[cfg(feature = "onnx")]
         {
             let file = File::open(path).map_err(|e| AppError::FileOpen {
@@ -392,15 +392,19 @@ fn print_inspect(artifact: &Artifact, hash: &str, verbose: bool) {
     if !artifact.tensors.is_empty() && verbose {
         println!("\nTensors (first 10)");
         println!("──────────────────");
+        println!("{:<40} {:<8} {:<20} Bytes", "Name", "Dtype", "Shape");
+        println!("{:<40} {:<8} {:<20} -----", "", "", "");
         for (name, tensor) in artifact.tensors.iter().take(10) {
             let shape_str = format!("{:?}", tensor.shape);
+            let display_name = if name.len() > 40 {
+                format!("{}...", &name[..37])
+            } else {
+                name.clone()
+            };
             println!(
-                "{}  {}  {}  {}",
-                name, tensor.dtype, shape_str, tensor.byte_length
+                "{:<40} {:<8} {:<20} {}",
+                display_name, tensor.dtype, shape_str, tensor.byte_length
             );
-        }
-        if artifact.tensors.len() > 10 {
-            println!("... and {} more", artifact.tensors.len() - 10);
         }
     }
 }

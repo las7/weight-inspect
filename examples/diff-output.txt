@@ -1,0 +1,93 @@
+# Example: weight-inspect diff output
+
+## Default output (text)
+
+```
+$ weight-inspect diff model-a.gguf model-b.gguf
+DIFFERENT
+--------------------
+Added tensors:    2
+Removed tensors:  0
+Modified tensors: 3
+Structural ID:    changed
+
+Tensor changes
+─────────────
+  blk.12.attn.wq.weight
+    dtype: f16 -> q4_k
+    shape: [4096, 4096] -> [4096, 5120]
+  blk.18.mlp.up_proj
+    dtype: f16 -> q4_k
+  output.weight
+    shape: [32000, 4096] -> [32000, 5120]
+```
+
+## Identical files
+
+```
+$ weight-inspect diff model-a.gguf model-a.gguf
+IDENTICAL
+--------------------
+No structural differences found.
+Structural ID:    unchanged
+```
+
+## Markdown output (for PR comments)
+
+```
+$ weight-inspect diff model-a.gguf model-b.gguf --format md
+## Structural Diff
+
+**Status:** ❌ DIFFERENT
+
+| Change Type | Count |
+|-------------|-------|
+| Added tensors | 2 |
+| Removed tensors | 0 |
+| Modified tensors | 3 |
+
+### Added tensors
+```
++ new_tensor.weight
++ encoder.layer_new
+```
+
+### Modified tensors
+```
+~ blk.12.attn.wq.weight
+  dtype: f16 → q4_k
+  shape: [4096, 4096] → [4096, 5120]
+~ blk.18.mlp.up_proj
+  dtype: f16 → q4_k
+~ output.weight
+  shape: [32000, 4096] → [32000, 5120]
+```
+```
+
+## JSON output
+
+```bash
+$ weight-inspect diff model-a.gguf model-b.gguf --json
+{
+  "format_equal": true,
+  "hash_equal": false,
+  "tensors_added": ["new_tensor.weight", "encoder.layer_new"],
+  "tensors_removed": [],
+  "tensor_changes": [
+    {
+      "name": "blk.12.attn.wq.weight",
+      "dtype_old": "f16",
+      "dtype_new": "q4_k",
+      "shape_old": [4096, 4096],
+      "shape_new": [4096, 5120]
+    }
+  ]
+}
+```
+
+## CI use (fail on diff)
+
+```bash
+# Exit code 0 if identical, 1 if different
+weight-inspect diff --fail-on-diff model-a.gguf model-b.gguf
+```
