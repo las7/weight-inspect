@@ -15,17 +15,21 @@ Model files are opaque blobs. When you download or convert a model, you can't ea
 
 weight-inspect provides **structural identity** - a canonical, deterministic representation of what a model file actually contains.
 
-### Core Value
+## Quick Start
 
-- **Understand** what any model file contains
-- **Compare** models structurally
-- **Reproduce** identical results across machines
+```bash
+# Get the structural identity (the core operation)
+weight-inspect id model.gguf
 
-## Features
+# Inspect full details
+weight-inspect inspect model.gguf
 
-- **Inspect** - Understand any model file's structure
-- **Hash** - Compute deterministic structural identity (SHA256 of canonical JSON)
-- **Diff** - Compare two models structurally (built on identity)
+# Compare two models
+weight-inspect diff a.gguf b.gguf
+
+# One-line summary (for GitHub issues)
+weight-inspect summary model.gguf
+```
 
 ## Installation
 
@@ -41,26 +45,38 @@ cargo build --release
 
 ## Usage
 
+### Identity (core feature)
+
 ```bash
-# Inspect a model file
-weight-inspect inspect model.gguf
-
-# Inspect with JSON output
-weight-inspect inspect model.gguf --json
-
-# Get structural identity
 weight-inspect id model.gguf
 
-# ID with JSON output
-weight-inspect id model.gguf --json
+# Output:
+# format: gguf
+# structural_hash: abc123...
+# tensor_count: 242
+# metadata_count: 22
+```
 
-# Diff two files
+### One-line summary
+
+```bash
+weight-inspect summary model.gguf
+
+# Output: gguf,3,242,22,abc123...
+```
+
+### Inspect (full details)
+
+```bash
+weight-inspect inspect model.gguf
+weight-inspect inspect model.gguf --json
+```
+
+### Compare
+
+```bash
 weight-inspect diff a.gguf b.gguf
-
-# JSON output (for tooling/integration)
 weight-inspect diff a.gguf b.gguf --json
-
-# Quiet mode (exit 0 if identical, 1 if different)
 weight-inspect diff a.gguf b.gguf --quiet
 ```
 
@@ -70,10 +86,7 @@ weight-inspect diff a.gguf b.gguf --quiet
 - Extracts metadata (hyperparameters, tokenizer config, etc.)
 - Lists tensor names, dtypes, and shapes
 - Computes structural hash (deterministic JSON → SHA256)
-- Compares two files showing:
-  - Added/removed/changed metadata keys
-  - Added/removed/changed tensors
-  - Tensor dtype/shape/byte_length changes
+- Compares two files showing structural differences
 
 ## What it does NOT do
 
@@ -93,5 +106,24 @@ We intentionally only read headers/metadata because:
 
 If you need content equality (byte-for-byte), that's a separate mode that would require loading all weights.
 
+## Design Principles
+
+1. **Deterministic**: Same input → same output across machines
+2. **Canonical**: Floats serialized as bit patterns, maps sorted
+3. **No heuristics**: Pure structural comparison
+4. **Fail fast**: Invalid files produce clear errors
+
 See [SPEC.md](SPEC.md) for full specification.
 
+## Use cases
+
+- "What model is this?" - Get instant structural identity
+- "Is this the same model?" - Compare structural hashes
+- "Why are these two models different?" - See exact differences
+- Verify model file integrity
+- Compare quantization variants
+- Detect structural changes in converted models
+
+## License
+
+MIT

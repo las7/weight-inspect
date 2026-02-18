@@ -39,6 +39,9 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    Summary {
+        file: String,
+    },
 }
 
 fn detect_format(path: &Path) -> Result<Artifact, String> {
@@ -223,6 +226,23 @@ fn main() {
                     }
                 }
             }
+        }
+        Commands::Summary { file } => {
+            let artifact = detect_format(Path::new(&file)).expect("failed to parse file");
+            let hash = compute_structural_hash(&artifact);
+
+            let version_str = artifact
+                .gguf_version
+                .map(|v| v.to_string())
+                .unwrap_or_default();
+            println!(
+                "{},{},{},{},{}",
+                format!("{:?}", artifact.format).to_lowercase(),
+                version_str,
+                artifact.tensors.len(),
+                artifact.metadata.len(),
+                hash
+            );
         }
     }
 }
