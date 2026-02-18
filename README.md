@@ -102,13 +102,3 @@ If you need content equality (byte-for-byte), that's a separate mode that would 
 
 See [SPEC.md](SPEC.md) for full specification.
 
-## Use cases
-
-- "Why are these two model files different?"
-- Verify model file integrity
-- Compare quantization variants
-- Detect structural changes in converted models
-
-## License
-
-MIT
