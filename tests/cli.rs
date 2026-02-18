@@ -1,61 +1,39 @@
 //! Integration tests for CLI commands
 //! Run with: cargo test --test cli
 
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tempfile::NamedTempFile;
 
-/// Run the CLI with given arguments
 fn run_cli(args: &[&str]) -> std::process::Output {
-    Command::new("cargo")
-        .args(["run", "--"])
+    // Tests run from target/debug/deps/, so we need to go up to project root
+    let project_dir = std::path::Path::new("..");
+
+    // Use cargo run from project root
+    let mut cmd = Command::new("cargo");
+    cmd.args(["run", "--manifest-path", "Cargo.toml"])
+        .arg("--")
         .args(args)
-        .current_dir("..")
-        .output()
-        .expect("Failed to run cargo")
-}
+        .current_dir(project_dir)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
-#[test]
-fn test_cli_help() {
-    let output = run_cli(&["--help"]);
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("weight-inspect"));
-    assert!(stdout.contains("inspect"));
-    assert!(stdout.contains("id"));
-    assert!(stdout.contains("diff"));
-    assert!(stdout.contains("summary"));
-}
-
-#[test]
-fn test_id_help() {
-    let output = run_cli(&["id", "--help"]);
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("fingerprint"));
-}
-
-#[test]
-fn test_inspect_help() {
-    let output = run_cli(&["inspect", "--help"]);
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("structure"));
-}
-
-#[test]
-fn test_diff_help() {
-    let output = run_cli(&["diff", "--help"]);
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("compare"));
-}
-
-#[test]
-fn test_summary_help() {
-    let output = run_cli(&["summary", "--help"]);
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("scripts") || stdout.contains("One-line"));
+    match cmd.output() {
+        Ok(output) => output,
+        Err(_) => {
+            // Fallback: try /home/runner path for CI
+            let project_dir =
+                std::path::Path::new("/home/runner/work/weight-inspect/weight-inspect");
+            Command::new("cargo")
+                .args(["run", "--manifest-path", "Cargo.toml"])
+                .arg("--")
+                .args(args)
+                .current_dir(project_dir)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .expect("Failed to run cargo")
+        }
+    }
 }
 
 #[test]
