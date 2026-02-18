@@ -1,24 +1,29 @@
 # weight-inspect
 
-Deterministic structural identity for GGUF and safetensors ML model files.
+Inspect GGUF and safetensors model files to see what's inside.
 
 ## The Problem
 
 Model files are opaque blobs. When you download or convert a model, you can't easily answer:
 
-- "What model family/architecture is this?"
+- "What model architecture is this?"
 - "What quantization is used?"
 - "What are the tensor shapes?"
 - "Is this the same model as before?"
 
 ## The Solution
 
-weight-inspect provides **structural identity** - a canonical, deterministic representation of what a model file actually contains.
+weight-inspect reads model file headers and gives you a **fingerprint** - a unique hash based on the model's structure (not the actual weights).
+
+This lets you:
+- See what's in any model file
+- Compare two models
+- Verify if models are structurally the same
 
 ## Quick Start
 
 ```bash
-# Get the structural identity (the core operation)
+# Get a fingerprint (the core operation)
 weight-inspect id model.gguf
 
 # Inspect full details
@@ -43,41 +48,84 @@ Or build from source:
 cargo build --release
 ```
 
-## Usage
+## Usage Examples
 
-### Identity (core feature)
+### Get a fingerprint
 
 ```bash
-weight-inspect id model.gguf
-
-# Output:
-# format: gguf
-# structural_hash: abc123...
-# tensor_count: 242
-# metadata_count: 22
+$ weight-inspect id model.gguf
+format: GGUF
+structural_hash: 2de46f849506b6a34b02d75796396ab6e1b9e24844a732de2a498463aa98376d
+tensor_count: 0
+metadata_count: 22
 ```
 
-### One-line summary
+### One-line summary (for GitHub issues)
 
 ```bash
-weight-inspect summary model.gguf
-
-# Output: gguf,3,242,22,abc123...
+$ weight-inspect summary model.gguf
+gguf,3,0,22,2de46f849506b6a34b02d75796396ab6e1b9e24844a732de2a498463aa98376d
 ```
 
-### Inspect (full details)
+### Inspect full details
 
 ```bash
-weight-inspect inspect model.gguf
-weight-inspect inspect model.gguf --json
+$ weight-inspect inspect model.gguf
+format: GGUF
+gguf_version: 3
+tensor_count: 242
+metadata_count: 22
+structural_hash: a0c216cce9dec82633dc61eb21c96b8e66609be26aee149caea9f2eb885409e0
+
+First 5 tensors:
+  1: blk.0.attn_norm.weight [768] (f32)
+  2: blk.0.ssm_a [16, 1536] (f32)
+  3: blk.0.ssm_conv1d.bias [1536] (f32)
+  4: blk.0.ssm_conv1d.weight [4, 1536] (f32)
+  5: blk.0.ssm_d [1536] (f32)
+  ... and 237 more
 ```
 
-### Compare
+### Compare two files
 
 ```bash
-weight-inspect diff a.gguf b.gguf
-weight-inspect diff a.gguf b.gguf --json
-weight-inspect diff a.gguf b.gguf --quiet
+$ weight-inspect diff a.gguf b.gguf
+Structural Identity:
+  format equal: true
+  hash equal: false
+  tensor count equal: true
+  metadata count equal: false
+
+Metadata:
+  + gpt2.attention.head_count
+  - llama.attention.head_count
+  ~ general.architecture: llama -> gpt2
+
+Tensors:
+  ~ blk.0.attn_q.weight:
+      dtype: f16 -> q4_k
+```
+
+### JSON output (for tooling)
+
+```bash
+$ weight-inspect id model.gguf --json
+{
+  "schema": 1,
+  "format": "gguf",
+  "structural_hash": "2de46f849506b6a34b02d75796396ab6e1b9e24844a732de2a498463aa98376d",
+  "tensor_count": 0,
+  "metadata_count": 22
+}
+```
+
+### Quiet mode (for scripts)
+
+```bash
+# Exit 0 if identical, 1 if different
+$ weight-inspect diff a.gguf b.gguf --quiet
+$ echo $?
+1
 ```
 
 ## What it does

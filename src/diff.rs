@@ -131,7 +131,7 @@ impl DiffResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{diff, DiffResult};
+    use super::diff;
     use crate::types::{Artifact, CanonicalValue, Format, Tensor};
     use std::collections::BTreeMap;
 
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_diff_metadata_added() {
-        let mut a = create_test_artifact(Format::GGUF, 3, 0);
+        let a = create_test_artifact(Format::GGUF, 3, 0);
         let mut b = a.clone();
         b.metadata.insert(
             "new_key".to_string(),
