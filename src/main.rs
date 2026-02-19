@@ -15,7 +15,7 @@ use weight_inspect::onnx::parse_onnx;
 use weight_inspect::onnx::OnnxParserError;
 use weight_inspect::safetensors::parse_safetensors;
 use weight_inspect::safetensors::SafetensorsParserError;
-use weight_inspect::types::Artifact;
+use weight_inspect::types::{Artifact, CanonicalValue};
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -105,6 +105,9 @@ enum Commands {
     Summary { file: String },
 }
 
+/// Detect the format of a model file and parse it into an Artifact.
+///
+/// Checks file extension first, then magic bytes for GGUF/safetensors.
 fn detect_format(path: &Path) -> Result<Artifact, AppError> {
     // Check for .onnx extension first (before magic byte detection)
     if path.extension().is_some_and(|e| e == "onnx") {
@@ -258,9 +261,7 @@ fn main() -> Result<(), AppError> {
             }
 
             if format != "text" && format != "md" {
-                return Err(AppError::InvalidFormat {
-                    format: format.clone(),
-                });
+                return Err(AppError::InvalidFormat { format });
             }
 
             print_diff_extended(&result, json, &format, only_changes, verbose)?;
@@ -296,7 +297,7 @@ fn main() -> Result<(), AppError> {
                     "ID:        wi:{}:{}:{}",
                     format!("{:?}", artifact.format).to_lowercase(),
                     artifact.gguf_version.unwrap_or(0),
-                    &hash[..8.min(hash.len())]
+                    &hash[..hash.len().min(8)]
                 );
                 println!("Stable:    yes (machine independent)");
                 println!("Includes:  header, tensor names, shapes, dtypes");
@@ -317,6 +318,18 @@ fn main() -> Result<(), AppError> {
             let hash = compute_structural_hash(&artifact)?;
 
             if json {
+                let chat_template = artifact
+                    .metadata
+                    .iter()
+                    .find(|(k, _)| k.contains("chat_template") || k.contains("ChatTemplate"))
+                    .and_then(|(_, v)| {
+                        if let CanonicalValue::String(s) = v {
+                            Some(s.clone())
+                        } else {
+                            None
+                        }
+                    });
+
                 #[derive(Serialize)]
                 struct InspectOutput {
                     schema: u32,
@@ -325,6 +338,8 @@ fn main() -> Result<(), AppError> {
                     tensor_count: usize,
                     metadata_count: usize,
                     structural_hash: String,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    chat_template: Option<String>,
                 }
                 let output = InspectOutput {
                     schema: 1,
@@ -333,6 +348,7 @@ fn main() -> Result<(), AppError> {
                     tensor_count: artifact.tensors.len(),
                     metadata_count: artifact.metadata.len(),
                     structural_hash: hash,
+                    chat_template,
                 };
                 println!(
                     "{}",
@@ -404,6 +420,24 @@ fn print_inspect(artifact: &Artifact, hash: &str, verbose: bool) {
         );
     }
 
+    if verbose && !artifact.metadata.is_empty() {
+        println!("\nMetadata");
+        println!("────────");
+        for (key, value) in artifact.metadata.iter() {
+            let is_chat_template = key.contains("chat_template") || key.contains("ChatTemplate");
+            if is_chat_template {
+                println!("{}:", key);
+                if let CanonicalValue::String(s) = value {
+                    println!("{}", s);
+                } else {
+                    println!("{:?}", value);
+                }
+            } else {
+                println!("{}: {:?}", key, value);
+            }
+        }
+    }
+
     println!("\nStructural ID");
     println!("─────────────");
     println!("Hash: {}", hash);
@@ -454,6 +488,25 @@ fn print_inspect_html(artifact: &Artifact, hash: &str) {
     );
     println!("<p><strong>Hash:</strong> {}</p>", hash);
     println!("</div>");
+
+    if !artifact.metadata.is_empty() {
+        println!("<h2>Metadata</h2>");
+        println!("<table><tr><th>Key</th><th>Value</th></tr>");
+        for (key, value) in artifact.metadata.iter() {
+            let is_chat_template = key.contains("chat_template") || key.contains("ChatTemplate");
+            if is_chat_template {
+                if let CanonicalValue::String(s) = value {
+                    println!("<tr><td>{}</td><td><pre>{}</pre></td></tr>", key, s);
+                } else {
+                    println!("<tr><td>{}</td><td>{}</td></tr>", key, value);
+                }
+            } else {
+                println!("<tr><td>{}</td><td>{}</td></tr>", key, value);
+            }
+        }
+        println!("</table>");
+    }
+
     println!("<h2>Tensors</h2>");
     println!("<table><tr><th>Name</th><th>Dtype</th><th>Shape</th><th>Bytes</th></tr>");
     for (name, tensor) in artifact.tensors.iter().take(100) {
@@ -537,9 +590,9 @@ fn print_diff_extended(
 
 fn print_diff_markdown(result: &diff::DiffResult, only_changes: bool) -> Result<(), AppError> {
     let status = if result.has_changes() {
-        "❌ DIFFERENT"
+        "[DIFFERENT]"
     } else {
-        "✅ IDENTICAL"
+        "[IDENTICAL]"
     };
     println!("## Structural Diff");
     println!();

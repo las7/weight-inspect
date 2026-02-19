@@ -1,0 +1,4 @@
+IDENTICAL
+--------------------
+No structural differences found.
+Structural ID:    unchanged

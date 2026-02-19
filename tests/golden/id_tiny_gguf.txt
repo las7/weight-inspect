@@ -1,0 +1,11 @@
+Structural identity
+──────────────────
+ID:        wi:gguf:3:d775e08a
+Stable:    yes (machine independent)
+Includes:  header, tensor names, shapes, dtypes
+Excludes:  raw weight bytes
+
+format: GGUF
+structural_hash: d775e08a3e69f1edce0f3230ecc28841dd1c871f467529a0a8e7aa361b671202
+tensor_count: 1
+metadata_count: 1

@@ -2,6 +2,31 @@ use crate::types::{Artifact, CanonicalValue};
 use serde::Serialize;
 use std::collections::BTreeSet;
 
+/// Result of comparing two model artifacts structurally.
+///
+/// Contains detailed information about differences in:
+/// - Metadata (added, removed, changed)
+/// - Tensors (added, removed, modified)
+/// - Structural identity (format, hash, counts)
+///
+/// # Example
+///
+/// ```
+/// use weight_inspect::{diff, gguf, types::Format};
+/// use std::io::Cursor;
+///
+/// let data1 = std::fs::read("tests/fixtures/tiny.gguf").unwrap();
+/// let data2 = std::fs::read("tests/fixtures/empty.gguf").unwrap();
+///
+/// let mut cursor1 = Cursor::new(data1);
+/// let mut cursor2 = Cursor::new(data2);
+///
+/// let artifact1 = gguf::parse_gguf(&mut cursor1).unwrap();
+/// let artifact2 = gguf::parse_gguf(&mut cursor2).unwrap();
+///
+/// let result = diff::diff(&artifact1, &artifact2);
+/// println!("Added tensors: {:?}", result.tensors_added);
+/// ```
 #[derive(Debug, Default, Serialize)]
 pub struct DiffResult {
     pub schema: u32,
@@ -18,6 +43,7 @@ pub struct DiffResult {
 }
 
 impl DiffResult {
+    /// Create a new DiffResult with default values.
     pub fn new() -> Self {
         Self {
             schema: 1,
@@ -26,24 +52,72 @@ impl DiffResult {
     }
 }
 
+/// Represents a metadata key that changed between two artifacts.
 #[derive(Debug, Serialize)]
 pub struct MetadataChange {
+    /// The metadata key that changed.
     pub key: String,
+    /// The original value.
     pub old_value: CanonicalValue,
+    /// The new value.
     pub new_value: CanonicalValue,
 }
 
+/// Represents a tensor that changed between two artifacts.
 #[derive(Debug, Serialize)]
 pub struct TensorChange {
+    /// The tensor name.
     pub name: String,
+    /// Original dtype (if different).
     pub dtype_old: Option<String>,
+    /// New dtype (if different).
     pub dtype_new: Option<String>,
+    /// Original shape (if different).
     pub shape_old: Option<Vec<u64>>,
+    /// New shape (if different).
     pub shape_new: Option<Vec<u64>>,
+    /// Original byte length (if different).
     pub byte_length_old: Option<u64>,
+    /// New byte length (if different).
     pub byte_length_new: Option<u64>,
 }
 
+/// Compare two artifacts and return their structural differences.
+///
+/// This function performs a deep comparison of:
+/// - Metadata keys and values
+/// - Tensor names, dtypes, shapes, and byte lengths
+///
+/// # Example
+///
+/// ```
+/// use weight_inspect::{diff, types::{Artifact, Format, Tensor}};
+/// use std::collections::BTreeMap;
+///
+/// let artifact_a = Artifact {
+///     format: Format::GGUF,
+///     gguf_version: Some(3),
+///     metadata: BTreeMap::new(),
+///     tensors: BTreeMap::new(),
+/// };
+///
+/// let mut artifact_b = Artifact {
+///     format: Format::GGUF,
+///     gguf_version: Some(3),
+///     metadata: BTreeMap::new(),
+///     tensors: BTreeMap::new(),
+/// };
+///
+/// artifact_b.tensors.insert("new.weight".to_string(), Tensor {
+///     name: "new.weight".to_string(),
+///     dtype: "f32".to_string(),
+///     shape: vec![10, 10],
+///     byte_length: 400,
+/// });
+///
+/// let result = diff::diff(&artifact_a, &artifact_b);
+/// assert_eq!(result.tensors_added, vec!["new.weight"]);
+/// ```
 pub fn diff(a: &Artifact, b: &Artifact) -> DiffResult {
     let mut result = DiffResult::new();
     result.format_equal = a.format == b.format;

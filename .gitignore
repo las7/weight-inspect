@@ -1,1 +1,4 @@
 target/
+proptest-regressions/
+*.rlib
+*.pdb

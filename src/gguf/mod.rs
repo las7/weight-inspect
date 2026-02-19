@@ -34,6 +34,18 @@ const MAX_TENSOR_COUNT: u64 = 100_000;
 const MAX_METADATA_COUNT: u64 = 10_000;
 const MAX_DIMENSIONS: u32 = 32;
 
+/// Parse a GGUF model file.
+///
+/// # Example
+///
+/// ```
+/// use weight_inspect::gguf;
+///
+/// let data = std::fs::read("tests/fixtures/tiny.gguf").unwrap();
+/// let mut cursor = std::io::Cursor::new(data);
+/// let artifact = gguf::parse_gguf(&mut cursor).unwrap();
+/// assert_eq!(artifact.format, weight_inspect::types::Format::GGUF);
+/// ```
 pub fn parse_gguf<R: Read + Seek>(reader: &mut R) -> Result<Artifact, GGUFParserError> {
     let magic = read_u32(reader)?;
     if magic != GGUF_MAGIC {

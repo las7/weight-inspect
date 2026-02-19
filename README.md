@@ -1,28 +1,27 @@
 # weight-inspect
 
-Inspect GGUF, safetensors, and ONNX model files to see what's inside.
+Inspect GGUF, safetensors, and ONNX model files to see architecture, tensor shapes, dtypes, quantization, and metadata.
 
-Despite the name, `weight-inspect` never loads or interprets weight values — it only inspects structure.
+Quickly answer:
+- What model architecture is this?
+- What quantization is used?
+- What are the tensor shapes?
+- How does this compare to another model?
 
-Unlike hashing the full file or loading the model, `weight-inspect` compares **structure only** — making it fast, safe, and deterministic.
+Also provides a deterministic structural fingerprint to verify if two models have the same structure.
 
 ## The Problem
 
-Model files are opaque blobs. When you download or convert a model, you can't easily answer:
-
-- "What model architecture is this?"
-- "What quantization is used?"
-- "What are the tensor shapes?"
-- "Is this the same model as before?"
+Model files are opaque blobs. When you download or convert a model, you can't easily see what's inside.
 
 ## The Solution
 
-weight-inspect reads model file headers and gives you a **fingerprint** - a unique hash based on the model's structure (not the actual weights).
+weight-inspect reads model file headers and shows you the structure — tensor names, shapes, dtypes, metadata — without loading any weight data.
 
 This lets you:
 - See what's in any model file
 - Compare two models
-- Verify if models are structurally the same
+- Get a deterministic fingerprint to verify structural identity
 
 ## Quick Start
 
@@ -63,7 +62,7 @@ cargo build --release --features onnx
 $ weight-inspect id model.gguf
 Structural identity
 ──────────────────
-ID:        wi:gguf:v3:9c1f3d2a
+ID:        wi:gguf:3:9c1f3d2a
 Stable:    yes (machine independent)
 Includes:  header, tensor names, shapes, dtypes
 Excludes:  raw weight bytes
@@ -142,7 +141,7 @@ Or for PR comments:
 $ weight-inspect diff a.gguf b.gguf --format md
 ## Structural Diff
 
-**Status:** ❌ DIFFERENT
+**Status:** [DIFFERENT]
 
 | Change Type | Count |
 |-------------|-------|
@@ -201,6 +200,46 @@ $ weight-inspect id model.gguf --json
 
 Structural hashes are versioned implicitly by format and canonicalization rules.
 
+## Library Usage
+
+weight-inspect is also available as a Rust library for programmatic use:
+
+```rust
+use weight_inspect::{gguf, hash, types::Artifact};
+
+let file = std::fs::File::open("model.gguf")?;
+let mut reader = std::io::BufReader::new(file);
+let artifact = gguf::parse_gguf(&mut reader)?;
+let structural_hash = hash::compute_structural_hash(&artifact)?;
+
+println!("Hash: {}", structural_hash);
+```
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+weight-inspect = "0.1"
+```
+
+For ONNX support:
+
+```toml
+[dependencies]
+weight-inspect = { version = "0.1", features = ["onnx"] }
+```
+
+### API Modules
+
+| Module | Description |
+|--------|-------------|
+| `gguf` | Parse GGUF model files |
+| `safetensors` | Parse safetensors files |
+| `onnx` | Parse ONNX files (with `features = ["onnx"]`) |
+| `hash` | Compute structural hashes |
+| `types` | Core types: `Artifact`, `Tensor`, `CanonicalValue` |
+| `diff` | Compare artifacts |
+
 ## What it does NOT do
 
 - **Never loads weight data** - Only reads headers and tensor descriptors
@@ -227,7 +266,7 @@ If you need content equality (byte-for-byte), that's a separate mode that would 
 4. **Fail fast**: Invalid files produce clear errors
 5. **Stable output**: The same input file will always produce identical output across runs and machines
 
-See [SPEC.md](SPEC.md) for full specification.
+See [SPEC.md](docs/SPEC.md) for full specification.
 
 ## Diff Output
 

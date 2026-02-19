@@ -12,6 +12,7 @@ mod onnx_proto {
 
 use onnx_proto::ModelProto;
 
+/// Error types for ONNX parsing.
 #[derive(Error, Debug)]
 pub enum OnnxParserError {
     #[error("failed to parse ONNX: {0}")]
@@ -20,6 +21,20 @@ pub enum OnnxParserError {
     IoError(#[from] std::io::Error),
 }
 
+/// Parse an ONNX model file.
+///
+/// Requires the `onnx` feature to be enabled.
+///
+/// # Example
+///
+/// ```
+/// use weight_inspect::onnx;
+///
+/// let data = std::fs::read("tests/fixtures/model.onnx").unwrap();
+/// let mut cursor = std::io::Cursor::new(data);
+/// let artifact = onnx::parse_onnx(&mut cursor).unwrap();
+/// assert_eq!(artifact.format, weight_inspect::types::Format::Onnx);
+/// ```
 pub fn parse_onnx<R: Read + Seek>(reader: &mut R) -> Result<Artifact, OnnxParserError> {
     let mut bytes = Vec::new();
     reader.read_to_end(&mut bytes)?;

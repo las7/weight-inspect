@@ -3,6 +3,21 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::Hash;
 
+/// Represents a parsed model file (GGUF, safetensors, or ONNX).
+///
+/// # Example
+///
+/// ```
+/// use weight_inspect::types::{Artifact, Format};
+/// use std::collections::BTreeMap;
+///
+/// let artifact = Artifact {
+///     format: Format::GGUF,
+///     gguf_version: Some(3),
+///     metadata: BTreeMap::new(),
+///     tensors: BTreeMap::new(),
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Artifact {
     pub format: Format,
@@ -12,6 +27,7 @@ pub struct Artifact {
     pub tensors: BTreeMap<String, Tensor>,
 }
 
+/// Model file format.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Format {
@@ -20,6 +36,9 @@ pub enum Format {
     Onnx,
 }
 
+/// Represents a metadata value in a model file.
+///
+/// Supports various types: null, bool, integers, floats, strings, and arrays.
 #[derive(Debug, Clone)]
 pub enum CanonicalValue {
     Null,
@@ -238,6 +257,7 @@ impl fmt::Display for CanonicalValue {
     }
 }
 
+/// Represents a tensor (weight) in a model file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Tensor {
     pub name: String,
