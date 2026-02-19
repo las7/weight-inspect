@@ -30,7 +30,7 @@ pub enum OnnxParserError {
 /// ```
 /// use weight_inspect::onnx;
 ///
-/// let data = std::fs::read("tests/fixtures/model.onnx").unwrap();
+/// let data = std::fs::read("tests/fixtures/mnist.onnx").unwrap();
 /// let mut cursor = std::io::Cursor::new(data);
 /// let artifact = onnx::parse_onnx(&mut cursor).unwrap();
 /// assert_eq!(artifact.format, weight_inspect::types::Format::Onnx);
