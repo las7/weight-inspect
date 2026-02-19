@@ -13,26 +13,10 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
+    name: Build release
+    runs-on: macos-latest
     permissions:
       contents: write
-    strategy:
-      matrix:
-        include:
-          - runner: macos-latest
-            target: x86_64-apple-darwin
-            ext: ''
-          - runner: macos-latest
-            target: aarch64-apple-darwin
-            ext: ''
-          - runner: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            ext: ''
-
-    defaults:
-      run:
-        shell: bash
 
     steps:
       - name: Get tag
@@ -52,17 +36,26 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build macOS x86_64
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Build macOS ARM
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Build Linux x86_64
+        run: |
+          cargo build --release --target x86_64-unknown-linux-gnu
+          strip target/x86_64-unknown-linux-gnu/release/weight-inspect
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_tag.outputs.tag }}
-          files: target/${{ matrix.target }}/release/weight-inspect${{ matrix.ext }}
+          files: |
+            target/x86_64-apple-darwin/release/weight-inspect
+            target/aarch64-apple-darwin/release/weight-inspect
+            target/x86_64-unknown-linux-gnu/release/weight-inspect
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
