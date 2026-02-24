@@ -304,7 +304,3 @@ Contributions are welcome, but please note:
 - Output stability and determinism are prioritized over new features
 - Changes that affect identity or ordering require discussion before PR
 - Please run `cargo clippy -- -D warnings` before submitting
-
-## License
-
-MIT
